@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VocabMaster - Pengingat Kosakata</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            min-height: 100vh;
+            background-color: #ffffff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 80px; /* Space for bottom nav */
+        }
+        .section-hidden {
+            display: none !important;
+        }
+        
+        /* Toast Animations */
+        .toast {
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            transform: translateY(-150%);
+            opacity: 0;
+        }
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        /* Progress Bar Animation */
+        .progress-fill {
+            transition: width 0.8s ease-out;
+        }
+
+        /* Quiz Card Animation */
+        .shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="app-container">
+        
+        <!-- Top App Bar -->
+        <header class="bg-indigo-600 text-white p-4 shadow-md rounded-b-2xl z-10 sticky top-0">
+            <h1 class="text-xl font-bold text-center"><i class="fa-solid fa-brain mr-2"></i>VocabMaster</h1>
+        </header>
+
+        <!-- Global Toast Notification -->
+        <div id="toast" class="toast fixed top-4 left-0 right-0 z-50 flex justify-center pointer-events-none px-4">
+            <div id="toast-content" class="px-6 py-3 rounded-full shadow-lg font-medium text-sm flex items-center gap-2">
+                <i id="toast-icon" class="fa-solid fa-info-circle"></i>
+                <span id="toast-message">Pesan</span>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-screen" class="absolute inset-0 bg-white z-40 flex flex-col items-center justify-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600 mb-4"></div>
+            <p class="text-slate-500 font-medium">Memuat data...</p>
+        </div>
+
+        <!-- MAIN CONTENT AREA -->
+        <div class="content-area p-5" id="main-content">
+
+            <!-- DASHBOARD SECTION -->
+            <section id="section-dashboard">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800 mb-1">Halo! 👋</h2>
+                    <p class="text-slate-500 text-sm">Mari tingkatkan kosa kata bahasa Inggrismu hari ini.</p>
+                </div>
+
+                <!-- Progress Card -->
+                <div class="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm mb-6">
+                    <div class="flex justify-between items-end mb-2">
+                        <div>
+                            <h3 class="font-semibold text-slate-700">Target Harian</h3>
+                            <p class="text-xs text-slate-500 mt-1"><span id="words-done">0</span> / <span id="words-total">0</span> kata dipelajari</p>
+                        </div>
+                        <div class="text-2xl font-bold text-indigo-600" id="progress-text">0%</div>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-3 mt-4 overflow-hidden">
+                        <div id="progress-bar" class="bg-indigo-500 h-3 rounded-full progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Action Card -->
+                <div class="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl text-center shadow-sm">
+                    <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                        <i class="fa-solid fa-gamepad"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-2">Waktunya Kuis!</h3>
+                    <p class="text-sm text-slate-600 mb-5">Uji hafalanmu dengan kata-kata yang belum dikuasai hari ini.</p>
+                    <button onclick="startQuiz()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors shadow-md shadow-indigo-200 active:scale-95 transform duration-150">
+                        Mulai Kuis Sekarang
+                    </button>
+                </div>
+            </section>
+
+            <!-- ADD VOCAB SECTION -->
+            <section id="section-add" class="section-hidden">
+                <h2 class="text-2xl font-bold text-slate-800 mb-6">Tambah Kosakata</h2>
+                
+                <form id="add-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Bahasa Inggris</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fa-solid fa-language text-slate-400"></i>
+                            </div>
+                            <input type="text" id="input-en" required autocomplete="off" placeholder="Contoh: Apple" class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Terjemahan Indonesia</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fa-solid fa-book text-slate-400"></i>
+                            </div>
+                            <input type="text" id="input-id" required autocomplete="off" placeholder="Contoh: Apel" class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors shadow-md shadow-indigo-200 mt-2 active:scale-95 transform duration-150">
+                        <i class="fa-solid fa-plus mr-2"></i>Simpan Kosakata
+                    </button>
+                </form>
+            </section>
+
+            <!-- LIST VOCAB SECTION -->
+            <section id="section-list" class="section-hidden">
+                <h2 class="text-2xl font-bold text-slate-800 mb-4">Daftar Kosakata</h2>
+                <div class="relative mb-4">
+                    <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="search-input" placeholder="Cari kata..." class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div id="vocab-list-container" class="space-y-3 pb-4">
+                    <!-- List items will be injected here -->
+                </div>
+            </section>
+
+            <!-- QUIZ SECTION (Takes over screen) -->
+            <section id="section-quiz" class="section-hidden absolute inset-0 bg-white z-20 flex flex-col p-5">
+                <div class="flex justify-between items-center mb-8 pt-2">
+                    <button onclick="endQuiz()" class="text-slate-400 hover:text-slate-600 w-10 h-10 flex items-center justify-center rounded-full bg-slate-100">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                    <div class="text-sm font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
+                        Sisa: <span id="quiz-remaining">0</span> kata
+                    </div>
+                </div>
+
+                <div class="flex-1 flex flex-col items-center justify-center pb-20">
+                    <p class="text-slate-500 font-medium mb-4 text-center">Apa arti kata ini?</p>
+                    <div id="quiz-card" class="bg-indigo-600 text-white w-full max-w-sm rounded-3xl p-10 text-center shadow-lg shadow-indigo-200 mb-8 transition-transform">
+                        <h2 id="quiz-word" class="text-4xl font-bold tracking-wide">Word</h2>
+                    </div>
+
+                    <form id="quiz-form" class="w-full max-w-sm">
+                        <input type="text" id="quiz-answer" autocomplete="off" placeholder="Ketik terjemahannya..." class="w-full text-center text-lg px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-0 focus:border-indigo-500 transition-all outline-none mb-4">
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-4 rounded-xl transition-colors shadow-lg shadow-indigo-200 active:scale-95 transform duration-150">
+                            Cek Jawaban
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bg-white border-t border-slate-100 fixed bottom-0 w-full max-w-[480px] px-6 py-3 flex justify-between items-center z-10 rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn flex flex-col items-center text-indigo-600 p-2 transition-colors">
+                <i class="fa-solid fa-house text-xl mb-1"></i>
+                <span class="text-[10px] font-medium">Beranda</span>
+            </button>
+            <button onclick="switchTab('add')" id="nav-add" class="nav-btn flex flex-col items-center text-slate-400 hover:text-indigo-500 p-2 transition-colors relative">
+                <div class="absolute -top-6 bg-indigo-600 text-white w-12 h-12 flex items-center justify-center rounded-full shadow-lg shadow-indigo-200 border-4 border-white transform transition-transform active:scale-90">
+                    <i class="fa-solid fa-plus text-xl"></i>
+                </div>
+                <span class="text-[10px] font-medium mt-6">Tambah</span>
+            </button>
+            <button onclick="switchTab('list')" id="nav-list" class="nav-btn flex flex-col items-center text-slate-400 hover:text-indigo-500 p-2 transition-colors">
+                <i class="fa-solid fa-book-open text-xl mb-1"></i>
+                <span class="text-[10px] font-medium">Daftar</span>
+            </button>
+        </nav>
+
+    </div>
+
+    <!-- Firebase SDK Setup -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Variables
+        let db, auth, currentUser;
+        let vocabList = [];
+        let quizQueue = [];
+        let currentQuizWord = null;
+
+        // Environment configurations
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'vocab-app';
+        let firebaseConfig = {};
+        try {
+            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        } catch (e) {
+            console.error("Firebase config parse error", e);
+        }
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Initialize App Function
+        async function initApp() {
+            if (!firebaseConfig) {
+                showToast("Kesalahan konfigurasi sistem.", "error");
+                document.getElementById('loading-screen').classList.add('hidden');
+                return;
+            }
+
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                currentUser = auth.currentUser;
+                if(currentUser) {
+                    setupDatabaseListener();
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+                showToast("Gagal masuk ke sistem.", "error");
+                document.getElementById('loading-screen').classList.add('hidden');
+            }
+        }
+
+        // Fetch Data from Firestore
+        function setupDatabaseListener() {
+            if (!currentUser) return;
+
+            const wordsRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'words');
+            
+            onSnapshot(wordsRef, (snapshot) => {
+                vocabList = [];
+                snapshot.forEach((doc) => {
+                    vocabList.push({ id: doc.id, ...doc.data() });
+                });
+                
+                updateDashboard();
+                renderVocabList();
+                document.getElementById('loading-screen').classList.add('hidden');
+            }, (error) => {
+                console.error("Firestore error:", error);
+                showToast("Gagal memuat data kosakata.", "error");
+            });
+        }
+
+        // Helpers
+        const getTodayString = () => {
+            const today = new Date();
+            // YYYY-MM-DD
+            return `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        };
+
+        const showToast = (message, type = "info") => {
+            const toast = document.getElementById('toast');
+            const toastContent = document.getElementById('toast-content');
+            const toastIcon = document.getElementById('toast-icon');
+            const toastMsg = document.getElementById('toast-message');
+
+            toastMsg.textContent = message;
+            
+            // Reset classes
+            toastContent.className = "px-6 py-3 rounded-full shadow-lg font-medium text-sm flex items-center gap-2";
+            
+            if (type === "success") {
+                toastContent.classList.add("bg-emerald-500", "text-white");
+                toastIcon.className = "fa-solid fa-check-circle";
+            } else if (type === "error") {
+                toastContent.classList.add("bg-rose-500", "text-white");
+                toastIcon.className = "fa-solid fa-circle-exclamation";
+            } else {
+                toastContent.classList.add("bg-slate-800", "text-white");
+                toastIcon.className = "fa-solid fa-info-circle";
+            }
+
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        };
+
+        // UI Updates
+        function updateDashboard() {
+            const today = getTodayString();
+            const total = vocabList.length;
+            const doneToday = vocabList.filter(w => w.lastReviewed === today).length;
+            
+            document.getElementById('words-total').textContent = total;
+            document.getElementById('words-done').textContent = doneToday;
+            
+            const percentage = total === 0 ? 0 : Math.round((doneToday / total) * 100);
+            
+            document.getElementById('progress-text').textContent = `${percentage}%`;
+            document.getElementById('progress-bar').style.width = `${percentage}%`;
+        }
+
+        function renderVocabList(filterText = "") {
+            const container = document.getElementById('vocab-list-container');
+            container.innerHTML = '';
+            
+            const today = getTodayString();
+            const filteredList = vocabList.filter(w => 
+                w.en.toLowerCase().includes(filterText.toLowerCase()) || 
+                w.id_ID.toLowerCase().includes(filterText.toLowerCase())
+            );
+
+            if(filteredList.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-slate-400">
+                        <i class="fa-solid fa-folder-open text-4xl mb-3"></i>
+                        <p>Belum ada kosakata.</p>
+                    </div>`;
+                return;
+            }
+
+            filteredList.forEach(word => {
+                const isDoneToday = word.lastReviewed === today;
+                const statusHtml = isDoneToday 
+                    ? `<span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-medium"><i class="fa-solid fa-check mr-1"></i>Selesai Hari Ini</span>`
+                    : `<span class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-md font-medium"><i class="fa-regular fa-clock mr-1"></i>Belum</span>`;
+
+                const div = document.createElement('div');
+                div.className = "bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center";
+                div.innerHTML = `
+                    <div>
+                        <h4 class="font-bold text-slate-800 text-lg leading-tight">${word.en}</h4>
+                        <p class="text-slate-500 text-sm mb-2">${word.id_ID}</p>
+                        ${statusHtml}
+                    </div>
+                    <button class="delete-btn text-slate-300 hover:text-rose-500 p-2 transition-colors" data-id="${word.id}">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+
+            // Attach delete events
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = e.currentTarget.getAttribute('data-id');
+                    if(currentUser) {
+                        try {
+                            const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'words', id);
+                            await deleteDoc(docRef);
+                            showToast("Kosakata dihapus.", "success");
+                        } catch (err) {
+                            showToast("Gagal menghapus.", "error");
+                        }
+                    }
+                });
+            });
+        }
+
+        // Navigation
+        window.switchTab = (tab) => {
+            document.getElementById('section-dashboard').classList.add('section-hidden');
+            document.getElementById('section-add').classList.add('section-hidden');
+            document.getElementById('section-list').classList.add('section-hidden');
+            document.getElementById('section-quiz').classList.add('section-hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if(btn.id !== 'nav-add') {
+                    btn.classList.remove('text-indigo-600');
+                    btn.classList.add('text-slate-400');
+                }
+            });
+
+            if(tab === 'dashboard') {
+                document.getElementById('section-dashboard').classList.remove('section-hidden');
+                document.getElementById('nav-dashboard').classList.add('text-indigo-600');
+                document.getElementById('nav-dashboard').classList.remove('text-slate-400');
+            } else if (tab === 'add') {
+                document.getElementById('section-add').classList.remove('section-hidden');
+            } else if (tab === 'list') {
+                document.getElementById('section-list').classList.remove('section-hidden');
+                document.getElementById('nav-list').classList.add('text-indigo-600');
+                document.getElementById('nav-list').classList.remove('text-slate-400');
+            }
+        };
+
+        // Add Form Submit
+        document.getElementById('add-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            const enInput = document.getElementById('input-en').value.trim();
+            const idInput = document.getElementById('input-id').value.trim();
+
+            if (!enInput || !idInput) return;
+
+            const newWord = {
+                en: enInput,
+                id_ID: idInput,
+                lastReviewed: null,
+                createdAt: new Date().toISOString()
+            };
+
+            try {
+                const wordsRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'words');
+                await addDoc(wordsRef, newWord);
+                
+                showToast("Kosakata berhasil ditambahkan!", "success");
+                document.getElementById('add-form').reset();
+                switchTab('dashboard');
+            } catch (err) {
+                showToast("Gagal menyimpan data.", "error");
+            }
+        });
+
+        // Search Input Listener
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            renderVocabList(e.target.value);
+        });
+
+        // Quiz Logic
+        window.startQuiz = () => {
+            const today = getTodayString();
+            // Queue words that haven't been reviewed today
+            quizQueue = vocabList.filter(w => w.lastReviewed !== today);
+
+            if(quizQueue.length === 0) {
+                if(vocabList.length === 0) {
+                    showToast("Kamu belum punya kosakata. Tambah dulu yuk!");
+                    switchTab('add');
+                } else {
+                    showToast("Hebat! Semua kata sudah dipelajari hari ini.", "success");
+                }
+                return;
+            }
+
+            // Shuffle queue
+            quizQueue.sort(() => Math.random() - 0.5);
+            
+            document.getElementById('section-dashboard').classList.add('section-hidden');
+            document.getElementById('section-quiz').classList.remove('section-hidden');
+            
+            loadNextQuizWord();
+        };
+
+        window.endQuiz = () => {
+            quizQueue = [];
+            document.getElementById('section-quiz').classList.add('section-hidden');
+            document.getElementById('section-dashboard').classList.remove('section-hidden');
+            document.getElementById('quiz-answer').value = '';
+        };
+
+        function loadNextQuizWord() {
+            if (quizQueue.length === 0) {
+                showToast("Kuis Selesai! Kerja Bagus.", "success");
+                endQuiz();
+                return;
+            }
+
+            document.getElementById('quiz-remaining').textContent = quizQueue.length;
+            currentQuizWord = quizQueue[0];
+            
+            const card = document.getElementById('quiz-card');
+            card.classList.remove('bg-rose-500', 'bg-emerald-500');
+            card.classList.add('bg-indigo-600');
+            
+            document.getElementById('quiz-word').textContent = currentQuizWord.en;
+            document.getElementById('quiz-answer').value = '';
+            document.getElementById('quiz-answer').focus();
+        }
+
+        document.getElementById('quiz-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentQuizWord) return;
+
+            const answer = document.getElementById('quiz-answer').value.trim().toLowerCase();
+            const correctAnswer = currentQuizWord.id_ID.trim().toLowerCase();
+
+            const card = document.getElementById('quiz-card');
+
+            if (answer === correctAnswer) {
+                // Benar
+                card.classList.remove('bg-indigo-600');
+                card.classList.add('bg-emerald-500');
+                showToast("Tepat Sekali!", "success");
+                
+                // Hapus dari antrean
+                quizQueue.shift();
+
+                // Update database
+                if (currentUser) {
+                    try {
+                        const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'words', currentQuizWord.id);
+                        await updateDoc(docRef, { lastReviewed: getTodayString() });
+                    } catch(err) {
+                        console.error("Failed to update status", err);
+                    }
+                }
+
+                setTimeout(loadNextQuizWord, 800);
+            } else {
+                // Salah
+                card.classList.remove('bg-indigo-600');
+                card.classList.add('bg-rose-500', 'shake');
+                showToast(`Salah! Jawaban: ${currentQuizWord.id_ID}`, "error");
+                
+                setTimeout(() => card.classList.remove('shake'), 400);
+
+                // Pindahkan ke belakang antrean
+                const missedWord = quizQueue.shift();
+                quizQueue.push(missedWord);
+
+                setTimeout(loadNextQuizWord, 1500);
+            }
+        });
+
+        // Run Init
+        window.addEventListener('DOMContentLoaded', initApp);
+
+    </script>
+</body>
+</html>
